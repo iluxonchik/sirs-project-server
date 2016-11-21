@@ -102,11 +102,12 @@ class FileEncryptTest(unittest.TestCase):
         fe = FileCryptor(key=self.key)
         fe.encrypt(path=self.f1.path)
 
-        encrypted_name = self.fernet.encrypt(self.F1_NAME.encode())
-        fe.decrypt(BASE_PATH + encrypted_name)
+        encrypted_name = self.fernet.encrypt(self.F1_NAME.encode()).decode('utf-8')
+        filename = fe.decrypt(BASE_PATH + encrypted_name)
+        import pdb; pdb.set_trace()
 
         self.assertTrue(os.path.isfile(BASE_PATH + self.F1_NAME), 
-            'unexpected decrypted file name')
+            'decrypted file not found')
 
         f1 = open(self.f1.path)
 
