@@ -35,17 +35,10 @@ class TextTestFile(TestFile):
         f.write(content)
         f.close()
 
-class FileEncryptTest(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
 
-    F1_NAME = 'best_pickup_line.txt'
-    F1_CONTENT = 'Would you do it if my name was Dre?' 
-
-
-    @staticmethod
-    def _mocked_urandom(n):
-        return bytes(n)  # return a vector with
-
-    def setUp(self):
+    def __init__(self, *args, **kwargs):
+        super(BaseTestCase, self).__init__(*args, **kwargs)
         # NOTE: it's tricky to test the filename and the contents, since every
         # time the file is encrypted, the ciphertext will be different, due to
         # random IVs and the format of the token returned by Fernet:
@@ -53,9 +46,28 @@ class FileEncryptTest(unittest.TestCase):
         # so in order to test for expected encrypted filenames and contents,
         # we have to have a fixed IV and Timestamp. To freeze the timestamp,
         # 'freezegun' module is used.
-        os.urandom = FileEncryptTest._mocked_urandom 
+        os.urandom = FileEncryptTest._mocked_urandom
         self.key = self._get_sym_key()  # raw base64-encoded 32 byte key
         self.fernet = Fernet(self.key)
+
+    @staticmethod
+    def _mocked_urandom(n):
+        return bytes(n)  # return a vector with n null bytes
+
+    @staticmethod
+    def _get_sym_key():
+        return base64.b64encode(bytes('thegame'.ljust(32), encoding='ascii'))
+
+class FileEncryptTest(BaseTestCase):
+
+    F1_NAME = 'best_pickup_line.txt'
+    F1_CONTENT = 'Would you do it if my name was Dre?' 
+
+    @staticmethod
+    def _mocked_urandom(n):
+        return bytes(n)  # return a vector with n null bytes
+
+    def setUp(self):
         self.test_files = []
         self._setup_files()        
 
@@ -141,11 +153,6 @@ class FileEncryptTest(unittest.TestCase):
         self.f1 = TextTestFile(self.F1_NAME, self.F1_CONTENT, 
                                                 base_path=BASE_PATH)
         self.test_files.append(self.f1)
-
-
-    @staticmethod
-    def _get_sym_key():
-        return base64.b64encode(bytes('thegame'.ljust(32), encoding='ascii'))
     
 
 if __name__ == '__main__':
