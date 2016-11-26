@@ -1,6 +1,7 @@
 import unittest
 
 import base64, os, shutil, filecmp
+from abc import ABCMeta
 
 from cryptography.fernet import Fernet
 
@@ -154,8 +155,16 @@ class FileEncryptTest(BaseTestCase):
                                                 base_path=BASE_PATH)
         self.test_files.append(self.f1)
 
-class EncryptImageTest(BaseTestCase):
-    KITTEN_IMG_PATH = './server/test/resources/kitten_ducks.jpg'
+class FileEncryptionBaseTestCase(metaclass=ABCMeta):
+    """
+    Abstract test class to test file encryption/decryption. To use it,
+    simply inherit form this class, followied by BaseTestCase and set FILE_PATH
+    variable to the path of the file you want to use for testing, for example:
+    
+        class EncryptImageTest(FileEncryptionBaseTestCase, BaseTestCase):
+            FILE_PATH = './server/test/resources/kitten_ducks.jpg'
+    """
+    FILE_PATH = './server/test/resources/kitten_ducks.jpg'
 
     def setUp(self):
         self.test_files = []
@@ -170,14 +179,14 @@ class EncryptImageTest(BaseTestCase):
         """
         # Ecncrypt file
         expected_name = self.fernet.encrypt(os.path.basename(
-                                        self.img1_path).encode()).decode()
+                                        self.file_path).encode()).decode()
 
         fe = FileCryptor(key=self.key)
-        enc_file_path = fe.encrypt(path=self.img1_path)
+        enc_file_path = fe.encrypt(path=self.file_path)
         self.test_files.append(enc_file_path)
 
         # make sure that the original file was removed
-        self.assertFalse(os.path.isfile(self.img1_path),
+        self.assertFalse(os.path.isfile(self.file_path),
                             'Non-encrypted file not removed after encryption.')
 
         self.assertEqual(BASE_PATH + expected_name, enc_file_path, 
@@ -195,21 +204,21 @@ class EncryptImageTest(BaseTestCase):
 
         orig_file_path = fe.decrypt(enc_file_path)
 
-        self.assertTrue(os.path.isfile(self.img1_path), 
+        self.assertTrue(os.path.isfile(self.file_path), 
             'Decrypted file not found.')
-        self.assertTrue(os.path.samefile(self.img1_path, orig_file_path),
+        self.assertTrue(os.path.samefile(self.file_path, orig_file_path),
             'Decrypted file does not have the expected path.')
 
-        files_equal = filecmp.cmp(self.img1_path, self.img1_original_path)
+        files_equal = filecmp.cmp(self.file_path, self.file_original_path)
         self.assertTrue(files_equal, 'Decrypted file is not equal to the '
                                                                 'original one.')
 
 
     def _setup_files(self):
-        self.img1_original_path = self.KITTEN_IMG_PATH
-        self.img1_path = shutil.copyfile(self.KITTEN_IMG_PATH, 
+        self.file_original_path = self.FILE_PATH
+        self.file_path = shutil.copyfile(self.FILE_PATH, 
                                                     BASE_PATH + 'test_img1.jpg')
-        self.test_files.append(self.img1_path)
+        self.test_files.append(self.file_path)
 
     def _clear_files(self):
         for file in self.test_files:
@@ -217,6 +226,13 @@ class EncryptImageTest(BaseTestCase):
                 os.remove(file)
             except Exception as _:
                 pass
+
+
+class EncryptImageTest(FileEncryptionBaseTestCase, BaseTestCase):
+    FILE_PATH = './server/test/resources/kitten_ducks.jpg' 
+
+class EncryptMP3Test(FileEncryptionBaseTestCase, BaseTestCase):
+    FILE_PATH = './server/test/resources/allegro_from_duet_in_c_major.mp3'
 
 
 if __name__ == '__main__':
