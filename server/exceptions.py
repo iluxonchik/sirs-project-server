@@ -20,3 +20,10 @@ class UserAlreadyExistsError(ValueError):
     in the system.
     """
     pass
+
+class SymKeyNotFoundError(ValueError):
+    """
+    Tried to register a user when there is already an entry with such username
+    in the system.
+    """
+    pass
