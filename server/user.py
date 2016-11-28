@@ -3,6 +3,7 @@ User managment.
 """
 import settings
 from server.decorators import user_required
+from server.crypto import TokenManager
 
 import sqlite3, os, logging
 from server.exceptions import NoUserRegisteredError, UserAlreadyExistsError
@@ -12,10 +13,15 @@ class User(object):
     def __init__(self, username):
         self._username = username
         self._conn = self._get_db_conn()
+        self._token_manager = TokenManager(username=self.username)
 
     @property
     def username(self):
         return self._username
+
+    @property
+    def token_manger(self):
+        return self._token_manager
 
     def _get_db_conn(self):
         if os.path.exists(settings.DB_NAME):

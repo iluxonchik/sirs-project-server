@@ -154,6 +154,12 @@ class TokenManager(object):
 
         return is_token_valid
 
+    def generate_new_sym_key(self):
+        key = os.urandom(32)
+
+        with open(self._key_path, mode='wb') as file:
+            file.write(key)
+
     def _setup_cipher(self):
         """
         All of that setup is done on purpuse. It allows to dynamically change
