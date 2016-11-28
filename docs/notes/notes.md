@@ -22,3 +22,13 @@ For integrity **SHA1** or **SHA-256**?
 - **SHA-256**, SHA-1 would be fine for checking downloaded files, but we want to
 make sure that the encrypted files have not been tampered with. That way we're also
 future-proofing. [GnuPG moved to SHA-256 in 2012](https://lists.gnupg.org/pipermail/gnupg-users/2016-January/055057.html)
+
+# Application
+
+* easily configurable through `settings.py`
+* `run.py` starts up the server
+
+# User Managment
+
+* sqlite3 stores user/password combination
+* protection agaisnt SQL injections, by using `?` placeholders and passing the values to `execute()`
