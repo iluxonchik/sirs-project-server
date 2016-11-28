@@ -2,9 +2,10 @@
 User managment.
 """
 import server.settings as settings
+from server.decorators import user_required
 
 import sqlite3, os, logging
-from server.exceptions import NoUserRegisteredError
+from server.exceptions import NoUserRegisteredError, UserAlreadyExistsError
 
 class User(object):
     
@@ -29,13 +30,17 @@ class User(object):
         
         return conn
 
-    def _check_user_exists(self):
-        res = self._conn.execute('''SELECT * FROM user''')
-        if (len(res.fetchall()) == 0):
-            logging.debug('Tried to authenticate, but no users have been found '
-                'in the database.')
-            raise NoUserRegisteredError()
+    def _add_user_to_db(self, password):
+        self._conn.execute('INSERT INTO user VALUES(?, ?)', 
+            (self.username, password))
+        self._conn.commit()
 
+    def _set_user_password(self, password):
+        self._conn.execute('UPDATE user SET password=? WHERE username=?',
+                                                    (password, self.username))
+        self._conn.commit()
+
+    @user_required
     def password_auth(self, password):
         """
         Authenticates user based on user/password combination.
@@ -44,13 +49,37 @@ class User(object):
             True - login successful
             False - login unsuccessful
         """
-        self._check_user_exists()
         res = self._conn.execute(
             '''SELECT * FROM user where username=? and password=?''', 
                                                     (self._username, password))
         return len(res.fetchall()) > 0
 
+    @user_required
     def token_auth(self, token):
         # TODO: check token validity
-        self._check_user_exists()
         pass
+
+    def register(self, password):
+        """
+        Registers the current user in the database. If the user already exists,
+        raises UserAlreadyExistsError.
+        """
+        res = self._conn.execute('SELECT * FROM user WHERE username=?',
+                                                            (self.username,))
+        if len(res.fetchall()) > 0:
+            raise UserAlreadyExistsError("'{}' already exists in the database"
+                .format(self.username))
+
+        self._add_user_to_db(password)
+        logging.info('User {} registered in the database.'
+                                                        .format(self.username))
+
+    @user_required
+    def update_password(self, new_password):
+        res = self._conn.execute('SELECT * FROM user WHERE username=?',
+                                                            (self.username,))
+        if len(res.fetchall()) != 1:
+            raise NoUserRegisteredError("User with username '{}' is not "
+                "registered in the system.".format(self.username))
+        
+        self._set_user_password(new_password)
