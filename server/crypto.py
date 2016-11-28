@@ -133,8 +133,16 @@ class TokenManager(object):
 
     def check_token(self, token):
         # decrypt the token
-        plain_token = self._decrypt(token)
-        plain_token = plain_token.decode('utf-8')
+        try:
+            plain_token = self._decrypt(token)
+            plain_token = plain_token.decode('utf-8')
+        except Exception as e:
+            # treating exceptions during decryption as invlid token.
+            # For exmaple, if the sym key was changed, errors in padding
+            # might occur.
+            logging.info('EXCEPTION: ' + str(e))
+            return False
+        
 
         token_prefix = self._username + self.SEPARATOR
         if not plain_token.startswith(token_prefix):

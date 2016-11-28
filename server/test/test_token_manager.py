@@ -95,6 +95,21 @@ class TokenManagerTestCase(unittest.TestCase):
         
         os.urandom = orig_os_urandom
 
+    def test_token_invalid_after_new_sym_key_genrated(self):
+        self._freeze_time()
+
+        tm = TokenManager(username='TheDocumentary', key=settings.SYM_KEY_PATH)
+        self.iv = tm._iv 
+
+        # gen a token valid for 1 minute
+        token = tm.generate_new(duration=Duration.minutes(1))
+
+        tm.generate_new_sym_key()
+        
+        self.assertFalse(tm.check_token(token), 'Valid token refused')
+        
+        self._unfreeze_time()
+
     def _freeze_time(self):
         # okay, let's mock out the time function
         curr_time = time.time()
