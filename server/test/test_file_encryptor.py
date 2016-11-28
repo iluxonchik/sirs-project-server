@@ -6,6 +6,7 @@ from abc import ABCMeta
 from cryptography.fernet import Fernet
 
 from server.crypto import FileCryptor
+
 from freezegun import freeze_time
 
 BASE_PATH = './'  # base path for creating test files
@@ -36,6 +37,7 @@ class TextTestFile(TestFile):
         f.write(content)
         f.close()
 
+@freeze_time("1992-12-15")
 class BaseTestCase(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -46,8 +48,10 @@ class BaseTestCase(unittest.TestCase):
         # Version ‖ Timestamp ‖ IV ‖ Ciphertext ‖ HMAC,
         # so in order to test for expected encrypted filenames and contents,
         # we have to have a fixed IV and Timestamp. To freeze the timestamp,
-        # 'freezegun' module is used.
+        # we we use the freezegun.freeze_time decorator.
+        # (fernet uses time.time() uses internally: https://github.com/pyca/cryptography/blob/master/src/cryptography/fernet.py#L49)
         os.urandom = FileEncryptTest._mocked_urandom
+        # time.time = lambda: 1992 # problem: makes test time always report 0
         self.key = self._get_sym_key()  # raw base64-encoded 32 byte key
         self.fernet = Fernet(self.key)
 
@@ -75,7 +79,7 @@ class FileEncryptTest(BaseTestCase):
     def tearDown(self):
         self._clear_files()
 
-    @freeze_time("1992-12-15")
+    
     def test_text_file_encryption(self):
         f1 = open(self.f1.path)
 
@@ -89,16 +93,16 @@ class FileEncryptTest(BaseTestCase):
         expected_content = self.fernet.encrypt(self.F1_CONTENT.encode())
 
         fe = FileCryptor(key=self.key)
-        ecn_file_path = fe.encrypt(path=self.f1.path)
+        enc_file_path = fe.encrypt(path=self.f1.path)
 
-        self.test_files.append(TestFile(name=os.path.basename(ecn_file_path)))
+        self.test_files.append(TestFile(name=os.path.basename(enc_file_path)))
 
-        self.assertEqual(BASE_PATH + expected_name, ecn_file_path, 
+        self.assertEqual(BASE_PATH + expected_name, enc_file_path, 
             'unexpected encrypted file path returned')
         
         self.assertTrue(os.path.isfile(BASE_PATH + expected_name), 
             'expected encrypted file not found')
-        f1 = open(BASE_PATH + expected_name, mode='rb')
+        f1 = open(enc_file_path, mode='rb')
         self.assertEqual(f1.read(), expected_content, 'unexpected encrypted '
                                                                    'content')
         f1.close()

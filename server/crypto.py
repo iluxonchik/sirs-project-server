@@ -1,13 +1,19 @@
 """
 Contains the cryptography-related functionality of the server.
 """
-import os
+import os, logging, time
 from enum import Enum
 
-from os.path import basename
-from cryptography.fernet import Fernet
+import settings
 
-from .exceptions import FileDoesNotExistError
+from os.path import basename
+
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import padding
+
+from .exceptions import FileDoesNotExistError, SymKeyNotFoundError
 
 class FileCryptor(object):
 
@@ -102,3 +108,101 @@ class FileCryptor(object):
             raise FileDoesNotExistError('{} does not exist'.format(path))
         elif path is None:
             raise FileExistsError('None is not a valid path for a file')
+
+class TokenManager(object):
+    SEPARATOR = '||'
+    TOKEN_FORMAT = '{}' + SEPARATOR +'{}'
+    def __init__(self, username, key=settings.SYM_KEY_PATH):
+        self._username = username
+        self._key_path = key
+        self._iv = os.urandom(16)  # for every user instance, the IV will be fixed
+
+    def generate_new(self, duration):
+        """
+        Generate a new token valid for 'duration' seconds.
+        
+        Token format: username||valid_until
+        Returns:
+            token (bytes): the generated token
+        """
+        self._setup_cipher()
+        plaintext_token = self.TOKEN_FORMAT.format(self._username, 
+            int(time.time()) + duration)
+        token = self._encrypt(plaintext_token)
+        return token
+
+    def check_token(self, token):
+        # decrypt the token
+        try:
+            plain_token = self._decrypt(token)
+            plain_token = plain_token.decode('utf-8')
+        except Exception as e:
+            # treating exceptions during decryption as invlid token.
+            # For exmaple, if the sym key was changed, errors in padding
+            # might occur.
+            logging.info('EXCEPTION: ' + str(e))
+            return False
+        
+
+        token_prefix = self._username + self.SEPARATOR
+        if not plain_token.startswith(token_prefix):
+            logging.info('Token rejected. Reason: token does not start '
+                ' with \'{}\'.'.format(token_prefix))
+            return False
+
+        token_time = plain_token[len(token_prefix):]
+        token_time = int(token_time)
+
+        is_token_valid = token_time >= int(time.time())
+
+        if is_token_valid:
+            logging.info('Token accepted.')
+        else:
+            logging.info('Token rejected. Reason: expired.')
+
+        return is_token_valid
+
+    def generate_new_sym_key(self):
+        key = os.urandom(32)
+
+        with open(self._key_path, mode='wb') as file:
+            file.write(key)
+
+    def _setup_cipher(self):
+        """
+        All of that setup is done on purpuse. It allows to dynamically change
+        the key at runtime, that's why we read the key file in every single time
+        we want to generate a token.
+        """
+        self.key = self._read_key()
+        self.cipher = Cipher(algorithms.AES(self.key), modes.CBC(self._iv),
+            backend=default_backend())
+        self.encryptor = self.cipher.encryptor()
+        self.decryptor = self.cipher.decryptor()
+        self.padder = padding.PKCS7(128).padder()
+        self.unpadder = padding.PKCS7(128).unpadder()
+
+    def _encrypt(self, data, encoding='utf-8'):
+        self._setup_cipher()
+        if not isinstance(data, bytes):
+            data = data.encode(encoding=encoding)
+
+        padded_data = self.padder.update(data) + self.padder.finalize()
+        enc_data = self.encryptor.update(padded_data) + self.encryptor.finalize()
+        return enc_data
+
+    def _decrypt(self, data):
+        self._setup_cipher()
+        plain_data = self.decryptor.update(data) + self.decryptor.finalize()
+        plain_data = self.unpadder.update(plain_data) + self.unpadder.finalize()
+        return plain_data
+
+    def _read_key(self):
+        if not os.path.isfile(self._key_path):
+            raise SymKeyNotFoundError('Key {} not found'.format(self._key_path))
+        with open(self._key_path, mode='rb') as f:
+            key = f.read()
+        if key is None:
+            raise SymKeyNotFoundError('Reading {} resulted in None'.
+                                                        format(self._key_path))
+        return key
