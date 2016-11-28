@@ -18,6 +18,7 @@ class TokenManagerTestCase(unittest.TestCase):
         self.key = os.urandom(32)
         self._setup_cipher()
         self.orig_time_func = time.time
+        self.orig_urandom = os.urandom
 
         settings.SYM_KEY_PATH = settings.TEST_BASE + 'sym.key'
 
@@ -26,6 +27,7 @@ class TokenManagerTestCase(unittest.TestCase):
 
     def tearDown(self):
         self._unfreeze_time()  # "catch-all"
+        os.urandom = self.orig_urandom
         os.remove(settings.SYM_KEY_PATH)
 
 
@@ -75,6 +77,23 @@ class TokenManagerTestCase(unittest.TestCase):
         self.assertFalse(tm.check_token(token), 'Expired token not rejected')
         self._unfreeze_time()
 
+    def test_new_sym_key_generation(self):
+        orig_os_urandom = os.urandom
+        os.urandom = lambda x: b'Still Dre day'
+
+        with open(settings.SYM_KEY_PATH, mode='rb') as f:
+            f_content = f.read()
+        self.assertNotEqual(f_content, os.urandom(32))
+        
+        tm = TokenManager(username='TheDoctorsAdvocate', 
+                                                key=settings.SYM_KEY_PATH)
+        tm.generate_new_sym_key()
+
+        with open(settings.SYM_KEY_PATH, mode='rb') as f:
+            f_content = f.read()
+        self.assertEqual(f_content, os.urandom(32))
+        
+        os.urandom = orig_os_urandom
 
     def _freeze_time(self):
         # okay, let's mock out the time function
