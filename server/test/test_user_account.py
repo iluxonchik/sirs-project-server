@@ -1,7 +1,7 @@
 import unittest
 
-import server.settings as settings
-from server.settings import TEST_BASE
+import settings
+from settings import TEST_BASE
 
 import os, glob, sqlite3, logging
 

@@ -1,7 +1,7 @@
 """
 User managment.
 """
-import server.settings as settings
+import settings
 from server.decorators import user_required
 
 import sqlite3, os, logging
