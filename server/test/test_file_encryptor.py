@@ -1,6 +1,6 @@
 import unittest
 
-import base64, os, shutil, filecmp, time
+import base64, os, shutil, filecmp
 from abc import ABCMeta
 
 from cryptography.fernet import Fernet
