@@ -78,7 +78,6 @@ class TokenManagerTestCase(unittest.TestCase):
         self._unfreeze_time()
 
     def test_new_sym_key_generation(self):
-        orig_os_urandom = os.urandom
         os.urandom = lambda x: b'Still Dre day'
 
         with open(settings.SYM_KEY_PATH, mode='rb') as f:
@@ -93,7 +92,7 @@ class TokenManagerTestCase(unittest.TestCase):
             f_content = f.read()
         self.assertEqual(f_content, os.urandom(32))
         
-        os.urandom = orig_os_urandom
+        os.urandom = self.orig_urandom
 
     def test_token_invalid_after_new_sym_key_genrated(self):
         self._freeze_time()
@@ -104,11 +103,10 @@ class TokenManagerTestCase(unittest.TestCase):
         # gen a token valid for 1 minute
         token = tm.generate_new(duration=Duration.minutes(1))
 
-        tm.generate_new_sym_key()
-        
-        self.assertFalse(tm.check_token(token), 'Valid token refused')
-        
         self._unfreeze_time()
+        tm.generate_new_sym_key()
+        self.assertFalse(tm.check_token(token), 'Invalid token accepted.')
+        
 
     def _freeze_time(self):
         # okay, let's mock out the time function

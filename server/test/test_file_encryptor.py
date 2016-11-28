@@ -50,10 +50,19 @@ class BaseTestCase(unittest.TestCase):
         # we have to have a fixed IV and Timestamp. To freeze the timestamp,
         # we we use the freezegun.freeze_time decorator.
         # (fernet uses time.time() uses internally: https://github.com/pyca/cryptography/blob/master/src/cryptography/fernet.py#L49)
-        os.urandom = FileEncryptTest._mocked_urandom
+        # IV uses os.urandom() under the hood, so we mock it to return a 
+        # fixed vector.
+
+        self.orig_urandom = os.urandom
         # time.time = lambda: 1992 # problem: makes test time always report 0
         self.key = self._get_sym_key()  # raw base64-encoded 32 byte key
         self.fernet = Fernet(self.key)
+
+    def setUp(self):
+        os.urandom = BaseTestCase._mocked_urandom
+
+    def tearDown(self):
+        os.urandom = self.orig_urandom
 
     @staticmethod
     def _mocked_urandom(n):
@@ -68,17 +77,14 @@ class FileEncryptTest(BaseTestCase):
     F1_NAME = 'best_pickup_line.txt'
     F1_CONTENT = 'Would you do it if my name was Dre?' 
 
-    @staticmethod
-    def _mocked_urandom(n):
-        return bytes(n)  # return a vector with n null bytes
-
     def setUp(self):
+        super().setUp()
         self.test_files = []
-        self._setup_files()        
+        self._setup_files()
 
     def tearDown(self):
+        super().tearDown()
         self._clear_files()
-
     
     def test_text_file_encryption(self):
         f1 = open(self.f1.path)
@@ -171,10 +177,12 @@ class FileEncryptionBaseTestCase(metaclass=ABCMeta):
     FILE_PATH = './server/test/resources/kitten_ducks.jpg'
 
     def setUp(self):
+        super().setUp()
         self.test_files = []
         self._setup_files()        
 
     def tearDown(self):
+        super().tearDown()
         self._clear_files()
 
     def test_image_encryption_decryption(self):
