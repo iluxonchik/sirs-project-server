@@ -48,6 +48,36 @@ class UserAccountTestCase(unittest.TestCase):
 
         self.assertTrue(user.password_auth(pwd))
 
+    def test_user_register(self):
+        user = User('Dr.Dre')
+        pwd = pbkdf2_hmac('sha256', b'The Chronic', b'Dr.Dre', 4)
+
+        user.register(pwd)
+        self.assertTrue(user.password_auth(pwd), 'User login after registration'
+            ' failed.')
+        
+        conn = sqlite3.connect(settings.DB_NAME)
+
+        res = conn.execute('SELECT * FROM user')
+        self.assertEqual(len(res.fetchall()), 1)
+
+        res = conn.execute('SELECT * FROM user WHERE username=? AND password=?',
+            ('Dr.Dre', pwd))
+        self.assertEqual(len(res.fetchall()), 1)
+
+    def test_user_update_password(self):
+        user = User('Dr.Dre')
+        pwd = pbkdf2_hmac('sha256', b'2001', b'Dr.Dre', 2)
+
+        user.register(pwd)
+        new_pwd = pbkdf2_hmac('sha256', b'Compton', b'Dr.Dre', 2)
+        user.update_password(new_pwd)
+
+        self.assertFalse(user.password_auth(pwd))
+        self.assertTrue(user.password_auth(new_pwd))
+
+
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=settings.LOG_LVL_TEST)
