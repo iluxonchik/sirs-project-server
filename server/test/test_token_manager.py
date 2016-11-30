@@ -35,7 +35,7 @@ class TokenManagerTestCase(unittest.TestCase):
         self._freeze_time()
 
         tm = TokenManager(username='TheDocumentary', key=settings.SYM_KEY_PATH)
-        self.iv = tm._iv 
+        # self.iv = tm._iv 
 
         # gen a token valid for 1 minute
         token = tm.generate_new(duration=Duration.minutes(1))
@@ -43,6 +43,7 @@ class TokenManagerTestCase(unittest.TestCase):
         token_format = TokenManager.TOKEN_FORMAT.format('TheDocumentary', 
                                             time.time() + Duration.minutes(1))
 
+        self.iv = tm._iv
         expected_token = self._encrypt(token_format)
 
         self._unfreeze_time()
@@ -53,7 +54,7 @@ class TokenManagerTestCase(unittest.TestCase):
         tm = TokenManager(username='TheDocumentary', key=settings.SYM_KEY_PATH)
         invalid_token = b'You would do it if my name was Dre?'
         
-        cipher = Cipher(algorithms.AES(self.key), modes.CBC(tm._iv),
+        cipher = Cipher(algorithms.AES(self.key), modes.CBC(os.urandom(16)),
             backend=default_backend())
         encryptor = cipher.encryptor()
         padder = padding.PKCS7(128).padder()
@@ -98,7 +99,7 @@ class TokenManagerTestCase(unittest.TestCase):
         self._freeze_time()
 
         tm = TokenManager(username='TheDocumentary', key=settings.SYM_KEY_PATH)
-        self.iv = tm._iv 
+        # self.iv = tm._iv 
 
         # gen a token valid for 1 minute
         token = tm.generate_new(duration=Duration.minutes(1))
@@ -131,7 +132,7 @@ class TokenManagerTestCase(unittest.TestCase):
 
         padded_data = self.padder.update(data) + self.padder.finalize()
         enc_data = self.encryptor.update(padded_data) + self.encryptor.finalize()
-        return enc_data
+        return enc_data + self.iv
 
     def _decrypt(self, data):
         self._setup_cipher()
