@@ -1,7 +1,9 @@
 """
 Contains the cryptography-related functionality of the server.
 """
-import os, logging, time
+import os
+import logging
+import time
 from enum import Enum
 
 import settings
@@ -15,6 +17,7 @@ from cryptography.hazmat.primitives import padding
 
 from .exceptions import FileDoesNotExistError, SymKeyNotFoundError
 
+
 class FileCryptor(object):
 
     class Action(Enum):
@@ -22,7 +25,6 @@ class FileCryptor(object):
         DECRYPT = 2
 
     def __init__(self, key):
-        # self.key = key
         self.fernet = Fernet(key=key)
 
     def encrypt(self, path):
@@ -42,8 +44,8 @@ class FileCryptor(object):
         """
         return self._encrypt_or_decrypt_file(path, action=self.Action.DECRYPT)
 
-    def _encrypt_or_decrypt_file(self, path, 
-                                    action=Action.ENCRYPT, encoding='utf-8'):
+    def _encrypt_or_decrypt_file(self, path,
+                                 action=Action.ENCRYPT, encoding='utf-8'):
         """
         Generic function which either encrypts or decrypts a file, based on the
         "action" arg.
@@ -56,9 +58,8 @@ class FileCryptor(object):
             path (string): path of the newly encrypted or decrypted file
         """
         # NOTE: this function has been written from the encrypting perspective
-        operation = (self.fernet.encrypt if action is self.Action.ENCRYPT 
-                                   else self.fernet.decrypt)
-
+        operation = (self.fernet.encrypt if action is self.Action.ENCRYPT
+                     else self.fernet.decrypt)
 
         f = self._open_file_read(path)
         path = f.name
@@ -77,18 +78,18 @@ class FileCryptor(object):
 
         return enc_file_path
 
-    def _encrypt_or_decrypt_filename(self, path, 
-                                    action=Action.DECRYPT, encoding='utf-8'):
+    def _encrypt_or_decrypt_filename(self, path,
+                                     action=Action.DECRYPT, encoding='utf-8'):
         # NOTE: this function has been written from the encrypting perspective
-        operation = (self.fernet.encrypt if action is self.Action.ENCRYPT 
-                                   else self.fernet.decrypt)
+        operation = (self.fernet.encrypt if action is self.Action.ENCRYPT
+                     else self.fernet.decrypt)
         filename = basename(path)
         enc_filename = operation(filename.encode(encoding=encoding))
         enc_filename = enc_filename.decode(encoding=encoding)
         file_dir = os.path.dirname(path)
         new_file = open(os.path.dirname(path) + '/{}'.format(enc_filename),
-                                                                    mode='wb')
-        return new_file 
+                        mode='wb')
+        return new_file
 
     def _write_content(self, file, content):
         """
@@ -97,11 +98,9 @@ class FileCryptor(object):
         file.write(content)
         file.close()
 
-
     def _open_file_read(self, path):
         self._check_file_path(path)
         return open(path, mode='rb')
-
 
     def _check_file_path(self, path):
         if not os.path.isfile(path):
@@ -109,25 +108,26 @@ class FileCryptor(object):
         elif path is None:
             raise FileExistsError('None is not a valid path for a file')
 
+
 class TokenManager(object):
     SEPARATOR = '||'
-    TOKEN_FORMAT = '{}' + SEPARATOR +'{}'
+    # username||SEPARATOR||content||iv (iv is added later)
+    TOKEN_FORMAT = '{}' + SEPARATOR + '{}'
+
     def __init__(self, username, key=settings.SYM_KEY_PATH):
         self._username = username
         self._key_path = key
-        self._iv = os.urandom(16)  # for every user instance, the IV will be fixed
 
     def generate_new(self, duration):
         """
         Generate a new token valid for 'duration' seconds.
-        
+
         Token format: username||valid_until
         Returns:
             token (bytes): the generated token
         """
-        self._setup_cipher()
-        plaintext_token = self.TOKEN_FORMAT.format(self._username, 
-            int(time.time()) + duration)
+        plaintext_token = self.TOKEN_FORMAT.format(self._username,
+                                                   int(time.time()) + duration)
         token = self._encrypt(plaintext_token)
         return token
 
@@ -142,12 +142,11 @@ class TokenManager(object):
             # might occur.
             logging.info('EXCEPTION: ' + str(e))
             return False
-        
 
         token_prefix = self._username + self.SEPARATOR
         if not plain_token.startswith(token_prefix):
             logging.info('Token rejected. Reason: token does not start '
-                ' with \'{}\'.'.format(token_prefix))
+                         ' with \'{}\'.'.format(token_prefix))
             return False
 
         token_time = plain_token[len(token_prefix):]
@@ -168,41 +167,49 @@ class TokenManager(object):
         with open(self._key_path, mode='wb') as file:
             file.write(key)
 
-    def _setup_cipher(self):
+    def _setup_cipher(self, iv):
         """
         All of that setup is done on purpuse. It allows to dynamically change
-        the key at runtime, that's why we read the key file in every single time
-        we want to generate a token.
+        the key at runtime, that's why we read the key file in every
+        single time we want to generate a token.
         """
+        self._iv = iv
         self.key = self._read_key()
-        self.cipher = Cipher(algorithms.AES(self.key), modes.CBC(self._iv),
-            backend=default_backend())
+        self.cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv),
+                             backend=default_backend())
         self.encryptor = self.cipher.encryptor()
         self.decryptor = self.cipher.decryptor()
         self.padder = padding.PKCS7(128).padder()
         self.unpadder = padding.PKCS7(128).unpadder()
 
     def _encrypt(self, data, encoding='utf-8'):
-        self._setup_cipher()
         if not isinstance(data, bytes):
             data = data.encode(encoding=encoding)
 
+        iv = os.urandom(16)
+        self._setup_cipher(iv)
+
         padded_data = self.padder.update(data) + self.padder.finalize()
-        enc_data = self.encryptor.update(padded_data) + self.encryptor.finalize()
-        return enc_data
+        enc_data = self.encryptor.update(
+            padded_data) + self.encryptor.finalize()
+        return enc_data + iv  # e(username)||e(data)||iv
 
     def _decrypt(self, data):
-        self._setup_cipher()
+        iv = data[-16:]  # iv has fixed-length: 16 bytes
+        data = data[:-16]  # strip the iv out
+        self._setup_cipher(iv)
         plain_data = self.decryptor.update(data) + self.decryptor.finalize()
-        plain_data = self.unpadder.update(plain_data) + self.unpadder.finalize()
+        plain_data = self.unpadder.update(
+            plain_data) + self.unpadder.finalize()
         return plain_data
 
     def _read_key(self):
         if not os.path.isfile(self._key_path):
-            raise SymKeyNotFoundError('Key {} not found'.format(self._key_path))
+            raise SymKeyNotFoundError(
+                'Key {} not found'.format(self._key_path))
         with open(self._key_path, mode='rb') as f:
             key = f.read()
         if key is None:
             raise SymKeyNotFoundError('Reading {} resulted in None'.
-                                                        format(self._key_path))
+                                      format(self._key_path))
         return key
