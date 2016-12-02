@@ -43,3 +43,15 @@ future-proofing. [GnuPG moved to SHA-256 in 2012](https://lists.gnupg.org/piperm
 * tokens have guarantee of integrity (provided by [Cryptography](https://cryptography.io/en/latest/hazmat/primitives/symmetric-encryption/))
 * token blacklist can be easily implemented by adding a list to the TokenManger class
 * each token is generated with a different iv
+
+# Bluetooth Events
+
+* When the server starts up, it has a bluetooth service listening for incomming connections, every message the bluetooth server
+gets is sent to the BluetoothEvenBus, which after doing some minimal parsing notifies every subscribed listener. Every listener is 
+free to do whatever he wants for each received event.
+* All bluetooth messages have the following format: `MSG_TYPE||data`, where `MSG_TYPE` identifies the type of message, which is
+then used to decide if a particular message is relevant for an event listener. All of the `MSG_TYPE`s are defined in server.bluetooth.protocol.
+* settings.py contains the settings for particular listeners (for example, the directory which should be encrypted/decrypted when the user enters/leaves the range).
+* The decision to use a BluetoothEventBus is justified by the fact that this simplifies the programming logic and makes the code cleaner,
+as well as easily extensible.
+* BluetoothEventBus works entirely with **bytes**

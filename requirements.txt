@@ -3,6 +3,7 @@ cryptography==1.5.3
 freezegun==0.3.8
 idna==2.1
 pyasn1==0.1.9
+PyBluez==0.22
 pycparser==2.17
 python-dateutil==2.6.0
 six==1.10.0
