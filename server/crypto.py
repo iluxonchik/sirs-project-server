@@ -8,6 +8,8 @@ from enum import Enum
 
 import settings
 
+import os
+
 from os.path import basename
 
 from cryptography.fernet import Fernet
@@ -33,6 +35,7 @@ class FileCryptor(object):
 
         Returns the path to the newly encrypted file.
         """
+        logging.debug('Encrypting file {}'.format(path))
         return self._encrypt_or_decrypt_file(path, action=self.Action.ENCRYPT)
 
     def decrypt(self, path):
@@ -42,6 +45,7 @@ class FileCryptor(object):
         Returns:
             (string) the path to the newly decrypted file.
         """
+        logging.debug('Decrypting file {}'.format(path))
         return self._encrypt_or_decrypt_file(path, action=self.Action.DECRYPT)
 
     def _encrypt_or_decrypt_file(self, path,
@@ -108,6 +112,22 @@ class FileCryptor(object):
         elif path is None:
             raise FileExistsError('None is not a valid path for a file')
 
+
+class DirectoryCryptor(object):
+    def __init__(self, key):
+        self._fe = FileCryptor(key)
+
+    def encrypt(self, path):
+        logging.debug('Encrypting directory {}'.format(path))
+        filenames = next(os.walk(path))[2]
+        for file in filenames:
+            self._fe.encrypt(os.path.join(path, file))
+
+    def decrypt(self, path):
+        logging.debug('Decrypting directory {}'.format(path))
+        filenames = next(os.walk(path))[2]
+        for file in filenames:
+            self._fe.decrypt(os.path.join(path, file))
 
 class TokenManager(object):
     SEPARATOR = '||'
