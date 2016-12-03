@@ -1,6 +1,8 @@
 import unittest
 import settings
 import server.bluetooth.protocol
+from server.bluetooth.event_bus import (OnBluetoothMessageListener,
+    BluetoothEventBus)  
 
 
 class MsgType(object):
@@ -11,7 +13,7 @@ class MsgType(object):
     ERROR = b'err'
 
 
-class IncDecListener(object, OnBluetoothMessageListener):
+class IncDecListener(OnBluetoothMessageListener):
     """
     Sample listener that increments or decremetns a variable,
     or simply saves the received data, based on the received event.
@@ -46,7 +48,7 @@ class BluetoothEventsTestCase(unittest.TestCase):
         pass
 
     def test_bluetooth_event_bus_sends_events(self):
-        eb = BluetoothEventBus(msg_type=MsgType)
+        eb = BluetoothEventBus(protocol=MsgType)
 
         il = IncDecListener()
         eb.subscribe(listener=il, msg_type=(
@@ -67,6 +69,7 @@ class BluetoothEventsTestCase(unittest.TestCase):
         self.assertEqual(il._last_msg_type, MsgType.INC)
         self.assertEqual(il._num_calls, 1)
 
+        eb.subscribe(il, (MsgType.SAVE_DATA,))
         expected_data = b'Produced by Dr Dre'
         eb.process(MsgType.SAVE_DATA + expected_data)
         self.assertEqual(il._last_msg_type, MsgType.SAVE_DATA)
@@ -76,10 +79,10 @@ class BluetoothEventsTestCase(unittest.TestCase):
         eb.process(MsgType.ERROR + b'something went wrong')
         self.assertEqual(il._last_msg_type, MsgType.SAVE_DATA)
         self.assertEqual(il._num_calls, 2)
-        self.assertIsNone(il._data)
+        self.assertEqual(il._data, b'Produced by Dr Dre')
 
         # now add a subscription to error mesages
-        eb.subscription(il, msg_type=(MsgType.ERROR))
+        eb.subscribe(il, msg_type=(MsgType.ERROR,))
 
         eb.process(MsgType.ERROR + b'something went wrong')
         self.assertEqual(il._last_msg_type, MsgType.ERROR)
@@ -104,7 +107,7 @@ class BluetoothEventsTestCase(unittest.TestCase):
 
         # since we're on it, let's check if the other event listener
         # got called when needed
-        self.assertEqual(il._num_calls, 7)
+        self.assertEqual(il._num_calls, 8)
 
         # make sure that if an unrecognized event is
         # received, everything still works as expected
@@ -115,4 +118,4 @@ class BluetoothEventsTestCase(unittest.TestCase):
 
         # since we're on it, let's check if the other event listener
         # got called when needed
-        self.assertEqual(il._num_calls, 7)
+        self.assertEqual(il._num_calls, 8)

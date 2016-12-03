@@ -27,3 +27,10 @@ class SymKeyNotFoundError(ValueError):
     in the system.
     """
     pass
+
+class MessageTypeError(ValueError):
+    """
+    The message type the listener tried to subscribe to is not found in the
+    protocol.
+    """
+    pass
