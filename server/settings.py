@@ -17,6 +17,8 @@ SYM_KEY_PATH = './server/keys/sym.key'  # used in token managment
 PRIV_KEY_PATH = './server/keys/priv.key'
 PUB_KEY_PATH = './server/keys/pub.key'
 
+DIR_PATH = './dir/'  # directory to be encrypted
+
 # Test settings
 TEST_BASE = './server/test/'  # include the trailing slash
 DB_NAME_TEST = 'TestMe.db'
