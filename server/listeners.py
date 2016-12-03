@@ -15,6 +15,7 @@ class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
         self._key = key
 
     def on_message(self, msg_type, data):
+        # TODO: check token (token is sent in decryption request)
         logging.info(
             'Will start encrypting/decrypting '
                                         'files with key: {}'.format(self._key))
@@ -37,3 +38,11 @@ class DirectoryEncryptorListener(BaseFileCipherListener):
 class DirectoryDecryptorListener(BaseFileCipherListener):
     def _apply_operation(self, dc, dirpath):
         dc.decrypt(dirpath)
+
+class UserPasswordAuthListener(OnBluetoothMessageListener):
+    """
+    Receive user password auth request, then either send "login failed"
+    msg or send back a newly genreated token.
+    """
+    pass
+
