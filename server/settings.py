@@ -12,6 +12,10 @@ DB_USER_TABLE = 'user'
 # Crypto settings
 PBKDF2_RNDS = 100000  # server-side PBKDF2 rounds
 
+# Bluetooth server settings
+BT_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+BT_SERVICE_NAME = "SIRSService"
+
 # Key Storage Settings
 SYM_KEY_PATH = './server/keys/sym.key'  # used in token managment
 PRIV_KEY_PATH = './server/keys/priv.key'
