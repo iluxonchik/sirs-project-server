@@ -20,6 +20,9 @@ DEFAULT_TOKEN_DURATION = Duration.minutes(1)
 # Bluetooth server settings
 BT_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
 BT_SERVICE_NAME = "SIRSService"
+# maximum number of failed login attempts before the server shuts down
+# setting this value to None means infinite attempts.
+MAX_LOGIN_ATTEMPTS = 3
 
 # Key Storage Settings
 SYM_KEY_PATH = './server/keys/sym.key'  # used in token managment

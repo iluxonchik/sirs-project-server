@@ -9,7 +9,7 @@ from server.exceptions import NoUserRegisteredError
 from server.utils import (derive_decryption_key,
     derive_pwd_hash_from_decryption_key, derive_pwd_hash_from_login)
 
-import logging
+import logging, sys
 import abc
 
 import server.settings as settings
@@ -81,6 +81,7 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
 
     def __init__(self, router):
         self._router = router
+        self._failed_logins = 0
 
     def on_message(self, msg_type, data):
         """
@@ -105,10 +106,21 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
                 logging.debug('Login success')
                 new_token = user.token_manger.generate_new()
                 self._router.send(Protocol.NEW_TOKEN, new_token)
+                self._failed_logins = 0
             else:
                 # wrong user or pass
                 logging.debug('Login error: wrong username or password')
                 self._router.send(Protocol.PWD_LOGIN_ERR)
+                self._trigger_failed_login()
         except NoUserRegisteredError:
             logging.debug('Login error: no user found in database')
             self._router.send(Protocol.NO_USER_ERR)
+            self._trigger_failed_login()
+
+    def _trigger_failed_login(self):
+        if settings.MAX_LOGIN_ATTEMPTS is not None:
+            self._failed_logins = self._failed_logins + 1
+            if self._failed_logins > settings.MAX_LOGIN_ATTEMPTS:
+                logging.info('{} failed login attempts, sever shutting down...'.
+                    format(self._failed_logins))
+                sys.exit(0)
