@@ -1,4 +1,6 @@
 import logging
+import base64
+import server.settings as settings
 
 class BlueRouter(object):
     """
@@ -17,18 +19,38 @@ class BlueRouter(object):
         """
         Decrypt bluetooth message, check MAC and check the token. 
         If the token is invalid, notify event bus.
+
+        NOTE: the implementation is slightly dirty, since the router will
+        actually look into the message content (because some messages require 
+        tokens and others don't). There are cleaner solutions, but we're
+        kind of out of time.
         """
         # TODO: decrypt, check token
+        if settings.BASE64_MODE:
+            logging.debug('NOTE: operating in base64 mode, actual received data'
+                ' is: {}'.format(data))
+            data = base64.b64decode(data)
+
+        # last 3 bytes of received data
+
         logging.debug('Router received and decrypted data: {}'.format(data))
+        
         return data
 
     def send(self, msg_type, data=b''):
         """
         Encrypt data, add MAC and send it to client.
         """
+        # TODO: encrypt, add MAC
         logging.debug('Router send request msg_type: {}, data: {}'.format(
             msg_type, data))
         data_to_send = msg_type + data
-        logging.debug('Router sending data to client: {}'.format(data))
+        logging.debug('Router sending data to client: {}'.format(data_to_send))
+
+        if settings.BASE64_MODE:
+            data_to_send = base64.b64encode(data_to_send)
+            logging.debug('NOTE: operating in base64 mode, '
+                'actual data sent is:{}'.format(data_to_send))
+
         self._cli_sock.send(data_to_send)
 

@@ -3,6 +3,7 @@ Utility classes and functions.
 """
 import settings
 
+from server.bluetooth.protocol import Protocol
 from hashlib import pbkdf2_hmac
 from base64 import b64encode, b64decode
 
@@ -38,4 +39,10 @@ def derive_pwd_hash_from_login(login_pwd, salt):
     dec_key = b64decode(derive_decryption_key(login_pwd, salt))
     h = derive_pwd_hash_from_decryption_key(dec_key, salt)
     return h
+
+def check_mac(data, mac):
+    """
+    Checks the message's MAC.
+    """
+    pass
 

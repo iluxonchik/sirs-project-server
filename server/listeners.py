@@ -24,7 +24,8 @@ class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
 
     def on_message(self, msg_type, data):
         """
-        Message data is: username||pbkdf2_of_pwd 
+        Message data is: username||pbkdf2_of_pwd||token||token_len.
+            token_len is always 3 bytes.
         Token checks are done in BlueRouter.
         """
         # TODO: REMOVE "if"! TEST CODE.
@@ -33,15 +34,45 @@ class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
             if data is None:
                 logging.error('Encryption/Decrytion listener '
                               'received \'None\' data')
-            data_len = len(data)
-            interm_key = data[data_len - 32:]  # interm key is always 256 biy
-            salt = data[:data_len - 32]
-            logging.debug('Intermediate key: {}'.format(interm_key))
-            logging.debug('Salt: {}'.format(salt))
+
+        data_len = len(data)
+
+        # last 3 bytes of the message indicate the token size
+        token_len = int(data[data_len - 3:])
+        data = data[:data_len - 3]
+        data_len = data_len - 3  # 3 bytes have been stripped off the data
+        logging.debug('\ttoken_len: {}'.format(token_len))
+
+
+        # extreact token
+        token = data[data_len - token_len:]
+        logging.debug('\ttoken: {}'.format(token))
+        data = data[:data_len - token_len]
+        data_len = data_len - token_len  # data changed, update its len
+        
+        interm_key = data[data_len - 32:]  # interm key is always 256 bit
+        logging.debug('\tinterm_key: {}, len: {}'.format(interm_key, 
+                                                            len(interm_key)))
+        salt = data[:data_len - 32]  # username
+        logging.debug('\tsalt(username): {}'.format(salt))
+
+        # let's check if the token is valid
+        u = User(salt.decode('utf-8'))
+        is_token_valid = u.token_manger.check_token(token)
+        
+        if not is_token_valid:
+            logging.info('Token rejected at listener!')
+            self._router.send(Protocol.TOKEN_WRONG_ERR)
+            return
+
+        logging.debug('Intermediate key: {}'.format(interm_key))
+        logging.debug('Salt: {}'.format(salt))
 
         # TODO: REMOVE! TEST CODE.
         # TEST MOCK
         if settings.MOCK_DEC_ENC_KEY:
+            logging.warn('MOCKING deryption/encryption key '
+                                        '(settings.MOCK_DEC_ENC_KEY = True)')
             interm_key = b'password pbkdf2 received from msg'
             salt = b'username obtained from msg'
 
