@@ -25,6 +25,10 @@ class Duration(object):
     def days(cls, seconds):
         return seconds * cls.DAY
 
+class StateFileState(object):
+    DECRYPTED = b'0'
+    ENCRYPTED = b'1'
+
 def derive_decryption_key(login_pwd, salt):
     """
     Derive decryption key from the received password.

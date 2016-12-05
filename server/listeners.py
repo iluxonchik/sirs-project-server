@@ -9,7 +9,7 @@ from server.exceptions import NoUserRegisteredError
 from server.utils import (derive_decryption_key,
     derive_pwd_hash_from_decryption_key, derive_pwd_hash_from_login)
 
-import logging, sys
+import logging, sys, base64
 import abc
 
 import server.settings as settings
@@ -17,10 +17,11 @@ from hashlib import pbkdf2_hmac
 
 
 class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
-    def __init__(self, cli_sock, router):
+    def __init__(self, cli_sock, router, internal_enc):
         self._router = router
         self._key = None
         self._cli_sock = cli_sock
+        self._internal_enc = internal_enc
 
     def on_message(self, msg_type, data):
         """
@@ -30,11 +31,6 @@ class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
         """
         # TODO: REMOVE "if"! TEST CODE.
         # TEST MOCK
-        if not settings.MOCK_DEC_ENC_KEY:
-            if data is None:
-                logging.error('Encryption/Decrytion listener '
-                              'received \'None\' data')
-
         data_len = len(data)
 
         # last 3 bytes of the message indicate the token size
@@ -77,6 +73,7 @@ class BaseFileCipherListener(OnBluetoothMessageListener, metaclass=abc.ABCMeta):
             salt = b'username obtained from msg'
 
         self._key = derive_decryption_key(interm_key, salt)
+        self._internal_enc.key = self._key
 
         logging.info(
             'Will start encrypting/decrypting '
@@ -103,6 +100,19 @@ class DirectoryDecryptorListener(BaseFileCipherListener):
         logging.info('Decrypting directory {}'.format(dirpath))
         dc.decrypt(dirpath)
 
+class InternalDirectoryEncryptorListner(OnBluetoothMessageListener):
+    def __init__(self, key=None):
+        self.key = None
+
+    def on_message(self, msg_type, data):
+        if  self.key is not None:
+            logging.info('Internal request for encryption success.')
+            dc = DirectoryCryptor(self.key)
+            dc.encrypt(DIR_PATH)
+        else:
+            logging.error('Internal request for encryption FAILED! Reason:'
+                ' self.key is None. FILES NOT ENCRYPTED!')
+
 
 class UserPasswordAuthListener(OnBluetoothMessageListener):
     """
@@ -110,13 +120,13 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
     msg or send back a newly genreated token.
     """
 
-    def __init__(self, router):
+    def __init__(self, router, internal_enc):
         self._router = router
         self._failed_logins = 0
+        self._internal_enc = internal_enc
 
     def on_message(self, msg_type, data):
         """
-
         data: username||pwd
         """
         data_len = len(data)
@@ -126,7 +136,9 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
         logging.debug( 'UserPasswordAuthListener received username: {}, '
             'password: {}'.format(username, pwd))
 
-        pwd = derive_pwd_hash_from_login(pwd, username)
+        decryption_key = base64.b64decode(derive_decryption_key(pwd, username))
+        self._internal_enc.key = decryption_key
+        pwd = derive_pwd_hash_from_login(decryption_key, username)
 
         username = username.decode(encoding='utf-8')
         user = User(username)

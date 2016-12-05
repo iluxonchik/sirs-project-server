@@ -5,7 +5,8 @@ import server.settings as settings
 from server.bluetooth.protocol import Protocol
 from server.bluetooth.event_bus import BluetoothEventBus
 from server.listeners import (DirectoryEncryptorListener, 
-    DirectoryDecryptorListener, UserPasswordAuthListener)
+    DirectoryDecryptorListener, UserPasswordAuthListener, 
+    InternalDirectoryEncryptorListner)
 
 from server.bluetooth.blue_router import BlueRouter
 
@@ -80,7 +81,7 @@ class Server(object):
         logging.info('Disconnected from {}'.format(cli_info))
         
         cli_sock.close()
-        eb.process(Protocol.ENCRYPT)
+        eb.process(Protocol.ENCRYPT_INTERNAL)
 
     def _generate_session_key(self):
         """
@@ -111,14 +112,18 @@ class Server(object):
         sesion_key = h.digest()
         key = base64.b64encode(sesion_key)
 
-        de = DirectoryEncryptorListener(cli_sock=cli_sock, router=router)
-        dd = DirectoryDecryptorListener(cli_sock=cli_sock, router=router)
+        ie = InternalDirectoryEncryptorListner()
+        de = DirectoryEncryptorListener(cli_sock=cli_sock, router=router, 
+            internal_enc=ie)
+        dd = DirectoryDecryptorListener(cli_sock=cli_sock, router=router, 
+            internal_enc=ie)
 
-        ua = UserPasswordAuthListener(router)
+        ua = UserPasswordAuthListener(router, internal_enc=ie)
 
         event_bus.subscribe(de, msg_type=(Protocol.ENCRYPT,))
         event_bus.subscribe(dd, msg_type=(Protocol.DECRYPT,))
         event_bus.subscribe(ua, msg_type=(Protocol.PWD_LOGIN,))
+        event_bus.subscribe(ie, msg_type=(Protocol.ENCRYPT_INTERNAL,))
 
     def _init_event_bus(self, cli_sock, sesion_key):
         """

@@ -35,3 +35,6 @@ class Protocol(object):
     DECRYPTION_ERR = b'dec_err'  # error in a decryption of a file
     NEW_TOKEN = b'tok_new'  # commands the client to update the token
     NO_USER_ERR = b'nu_err'
+
+    # internal messages
+    ENCRYPT_INTERNAL = b'int_enc'

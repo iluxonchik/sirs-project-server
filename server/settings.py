@@ -35,6 +35,12 @@ PUB_KEY_PATH = './server/keys/pub.key'
 
 DIR_PATH = './dir/'  # directory to be encrypted
 
+# state file: this is how the server knows its state: wether the files
+# are encrypted of decrypted. This file is encrypted with the server's
+# symmetric key, so the guarantees of confidentiality and integrity are there
+# 0 or something else - decrypted; 1 - encrypted
+STATE_FILE = './server/state.data' 
+
 # Test settings
 TEST_BASE = './server/test/'  # include the trailing slash
 DB_NAME_TEST = 'TestMe.db'
