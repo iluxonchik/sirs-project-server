@@ -27,3 +27,6 @@ DIR_PATH = './dir/'  # directory to be encrypted
 TEST_BASE = './server/test/'  # include the trailing slash
 DB_NAME_TEST = 'TestMe.db'
 LOG_LVL_TEST = logging.DEBUG
+
+# Bluetooth debugging settings
+MOCK_DEC_ENC_KEY = True

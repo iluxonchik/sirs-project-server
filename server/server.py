@@ -1,7 +1,15 @@
-import logging
-import server.settings as settings
+import logging, os, base64
+from hashlib import sha256
 
-from bluetooth import *
+import server.settings as settings
+from server.bluetooth.protocol import Protocol
+from server.bluetooth.event_bus import BluetoothEventBus
+from server.listeners import (DirectoryEncryptorListener, 
+                                                DirectoryDecryptorListener)
+
+from server.bluetooth.blue_router import BlueRouter
+
+from bluetooth import*
 
 class Server(object):
     def __init__(self):
@@ -54,13 +62,17 @@ class Server(object):
         #       3. Send/receive BT msgs (always encrypted with session key)
 
         session_key = self._generate_session_key()  # negortiate sesison key
-        eb = self._init_event_bus(cli_sock)
+        (eb, router) = self._init_event_bus(cli_sock, session_key)
         try:
             while True:
                 data = cli_sock.recv(1024)
+                data = router.receive(data)  # decrypt and check token
+
                 if len(data) == 0: break
-                # TODO: decrypt data
+                
                 logging.info("Received: {}".format(data))
+                eb.process(data)
+                
                 # cli_sock.send(b'Hello, world!')
         except IOError as e:
             logging.warn('IOError: {}'.format(str(e)))
@@ -68,7 +80,7 @@ class Server(object):
         logging.info('Disconnected from {}'.format(cli_info))
         
         cli_sock.close()
-        # TODO: send 'Encrypt!' message to event bus
+        eb.process(Protocol.ENCRYPT)
 
     def _generate_session_key(self):
         """
@@ -78,17 +90,44 @@ class Server(object):
         are authenticated.
 
         Returs:
-            session_key
+            session_key: 256-bit key (to be used with AES)
         """
         logging.info('Initiating session key genreation...')
-        pass
+        
+        # TODO: negotiate key
+        negotiated_key = b'Diffie-Hellman negotiated key'
+        
+        h = sha256()
+        h.update(negotiated_key)
+        session_key = h.digest()
+        return session_key
 
-    def _init_event_bus(self, cli_sock):
+    def _init_listeners(self, cli_sock, event_bus, router):
+        """
+        Init listeners.
+        """
+        h = sha256()
+        h.update(b'hello')
+        sesion_key = h.digest()
+        key = base64.b64encode(sesion_key)
+
+        de = DirectoryEncryptorListener(cli_sock=cli_sock, router=router)
+        dd = DirectoryDecryptorListener(cli_sock=cli_sock, router=router)
+
+        event_bus.subscribe(de, msg_type=(Protocol.ENCRYPT,))
+        event_bus.subscribe(dd, msg_type=(Protocol.DECRYPT,))
+
+    def _init_event_bus(self, cli_sock, sesion_key):
         """
         Init event bus and listeners.
 
         Returns:
-            event_bus (BluetoothEventBus)
+            (event_bus, blue_router)
         """
         logging.info('Initializing event bus...')
-        pass
+        event_bus = BluetoothEventBus(protocol=Protocol)
+        blue_router = BlueRouter(cli_sock, event_bus, sesion_key)
+        self._init_listeners(cli_sock, event_bus, blue_router)
+        return (event_bus, blue_router)
+
+

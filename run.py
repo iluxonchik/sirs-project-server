@@ -15,7 +15,7 @@ def _bt_server_test():
     s.start()
 
 def _event_bus_test():
-    key = key = base64.b64encode(os.urandom(32))
+    key = base64.b64encode(os.urandom(32))
     eb = BluetoothEventBus(Protocol)
     de = DirectoryEncryptorListener(key)
     dd = DirectoryDecryptorListener(key)
