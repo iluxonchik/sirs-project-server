@@ -18,12 +18,17 @@ class BlueRouter(object):
         Decrypt bluetooth message, check MAC and check the token. 
         If the token is invalid, notify event bus.
         """
-        # TODO:
+        # TODO: decrypt, check token
         logging.debug('Router received and decrypted data: {}'.format(data))
         return data
 
-    def send(self, data):
+    def send(self, msg_type, data=b''):
         """
         Encrypt data, add MAC and send it to client.
         """
+        logging.debug('Router send request msg_type: {}, data: {}'.format(
+            msg_type, data))
+        data_to_send = msg_type + data
         logging.debug('Router sending data to client: {}'.format(data))
+        self._cli_sock.send(data_to_send)
+

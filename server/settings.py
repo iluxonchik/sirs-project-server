@@ -3,6 +3,8 @@ Server settings.
 """
 import logging
 
+from server.utils import Duration
+
 LOG_LVL = logging.DEBUG  # log level in app
 
 # DB Settings
@@ -11,6 +13,9 @@ DB_USER_TABLE = 'user'
 
 # Crypto settings
 PBKDF2_RNDS = 100000  # server-side PBKDF2 rounds
+
+# Token Settings
+DEFAULT_TOKEN_DURATION = Duration.minutes(1)
 
 # Bluetooth server settings
 BT_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ee"

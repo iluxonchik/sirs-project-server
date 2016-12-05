@@ -5,7 +5,7 @@ import server.settings as settings
 from server.bluetooth.protocol import Protocol
 from server.bluetooth.event_bus import BluetoothEventBus
 from server.listeners import (DirectoryEncryptorListener, 
-                                                DirectoryDecryptorListener)
+    DirectoryDecryptorListener, UserPasswordAuthListener)
 
 from server.bluetooth.blue_router import BlueRouter
 
@@ -114,8 +114,11 @@ class Server(object):
         de = DirectoryEncryptorListener(cli_sock=cli_sock, router=router)
         dd = DirectoryDecryptorListener(cli_sock=cli_sock, router=router)
 
+        ua = UserPasswordAuthListener(router)
+
         event_bus.subscribe(de, msg_type=(Protocol.ENCRYPT,))
         event_bus.subscribe(dd, msg_type=(Protocol.DECRYPT,))
+        event_bus.subscribe(ua, msg_type=(Protocol.PWD_LOGIN,))
 
     def _init_event_bus(self, cli_sock, sesion_key):
         """

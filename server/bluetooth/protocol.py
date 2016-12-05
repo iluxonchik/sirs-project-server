@@ -27,3 +27,4 @@ class Protocol(object):
     TOKEN_WRONG_ERR = b'tok_wrong_err'
     DECRYPTION_ERR = b'dec_err'  # error in a decryption of a file
     NEW_TOKEN = b'tok_new'  # commands the client to update the token
+    NO_USER_ERR = b'nu_err'

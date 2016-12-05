@@ -6,7 +6,7 @@ import logging
 import time
 from enum import Enum
 
-import settings
+import server.settings as settings
 
 import os
 
@@ -16,6 +16,8 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
+
+from server.utils import Duration
 
 from .exceptions import FileDoesNotExistError, SymKeyNotFoundError
 
@@ -138,7 +140,7 @@ class TokenManager(object):
         self._username = username
         self._key_path = key
 
-    def generate_new(self, duration):
+    def generate_new(self, duration=settings.DEFAULT_TOKEN_DURATION):
         """
         Generate a new token valid for 'duration' seconds.
 
