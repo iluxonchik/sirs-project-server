@@ -141,6 +141,8 @@ class DirectoryCryptor(object):
             self._fe.encrypt(os.path.join(path, file))
 
         self._write_to_state_file(StateFileState.ENCRYPTED)
+        # TODO: if the content of the sate file was vaild, backup all of the
+        # files in the encrypted dir
 
 
     def decrypt(self, path):
@@ -204,6 +206,8 @@ class DirectoryCryptor(object):
             logging.info('Unexpected content of state file: {}\n'.format(state) + 
                 'This could simply mean that the file is uninitialized (first'
                 ' start)')
+            # TODO: raise an exception here, so that the files are not
+            # backed up after encryption?
             return False
 
 class TokenManager(object):
