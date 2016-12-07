@@ -50,22 +50,6 @@ def derive_pwd_hash_from_login(login_pwd, salt):
     h = derive_pwd_hash_from_decryption_key(dec_key, salt)
     return h
 
-
-def _setup_cipher(self, iv):
-    """
-    All of that setup is done on purpuse. It allows to dynamically change
-    the key at runtime, that's why we read the key file in every
-    single time we want to generate a token.
-    """
-    self._iv = iv
-    self.key = self._read_key()
-    self.cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv),
-                         backend=default_backend())
-    self.encryptor = self.cipher.encryptor()
-    self.decryptor = self.cipher.decryptor()
-    self.padder = padding.PKCS7(128).padder()
-    self.unpadder = padding.PKCS7(128).unpadder()
-
 def encrypt_data(data, key, iv, encoding='utf-8'):
     if not isinstance(data, bytes):
         data = data.encode(encoding=encoding)

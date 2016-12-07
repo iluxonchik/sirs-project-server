@@ -2,6 +2,7 @@ import logging
 import base64
 import server.settings as settings
 from server.utils import encrypt_data, decrypt_data, check_mac, compute_mac
+from server.bluetooth.protocol import Protocol
 
 class BlueRouter(object):
     """
@@ -46,15 +47,21 @@ class BlueRouter(object):
 
         if not self._is_valid_iv(iv):
             logging.warn('INVALID IV in received mesasge, returning...')
+            if settings.SEND_ERROR_MSGS:
+                self.send(Protocol.ERROR, b'Iinvalid IV')
             return
         else:
             logging.debug('Valid IV')
 
+        logging.debug('Decypting data: {} [len(data)={}]'.format(data, len(data)))
+
         # Decrypt the message
         data = decrypt_data(data, self._key, iv)
 
-        if not check_mac(data, iv, mac):
+        if not check_mac(self._key, data, iv, mac):
             logging.warn('INVALID MAC in received message, returning...')
+            if settings.SEND_ERROR_MSGS:
+                self.send(Protocol.ERROR, b'Iinvalid MAC')
             return
 
         logging.debug('Router received and decrypted data: {}'.format(data))
@@ -76,7 +83,7 @@ class BlueRouter(object):
 
         mac = compute_mac(self._key, data, iv)
 
-        data_to_send = data + mac
+        data_to_send = data + iv + mac
 
         if settings.BASE64_MODE:
             data_to_send = base64.b64encode(data_to_send)

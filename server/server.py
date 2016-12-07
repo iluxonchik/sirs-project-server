@@ -69,6 +69,10 @@ class Server(object):
                 data = cli_sock.recv(1024)
                 data = router.receive(data)  # decrypt and check token
 
+                if data is None:
+                    # if something went wrong, for example, invalid MAC or IV
+                    continue
+
                 if len(data) == 0: break
                 
                 logging.info("Received: {}".format(data))
@@ -90,10 +94,12 @@ class Server(object):
         Messages sent and received here are not encrypted. Values 'a' and 'b'
         are authenticated.
 
+        {msg}
+
         Returs:
             session_key: 256-bit key (to be used with AES)
         """
-        logging.info('Initiating session key genreation...')
+        logging.info('Initiating session key generation...')
         
         # TODO: negotiate key
         negotiated_key = b'Diffie-Hellman negotiated key'

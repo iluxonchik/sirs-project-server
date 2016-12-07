@@ -29,6 +29,7 @@ class Protocol(object):
     PWD_LOGIN = b'log'
     REG = b'reg'
     INFO = b'info'
+    ERROR = b'err'  # error messages
 
     # messages server->client
     PWD_LOGIN_ERR = b'log_err'

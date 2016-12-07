@@ -27,6 +27,9 @@ MAX_LOGIN_ATTEMPTS = 3
 # communications are encoded to base64 before being sent. The received BT msgs
 # are also assumed to be Base64 encoded
 BASE64_MODE = True  # turns base64 on/off for BluetoothRouter
+# enables/disables the sending of error messages to client, such as notifications
+# about invalid IVs or MACs
+SEND_ERROR_MSGS = True 
 
 # Key Storage Settings
 SYM_KEY_PATH = './server/keys/sym.key'  # used in token managment
