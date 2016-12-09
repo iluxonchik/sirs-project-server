@@ -204,7 +204,7 @@ class Server(object):
         event_bus.subscribe(ie, msg_type=(Protocol.ENCRYPT_INTERNAL,))
         
         if not settings.SAFE_MODE:
-            ur = UserRegistrationListener()
+            ur = UserRegistrationListener(router, internal_enc=ie)
             event_bus.subscribe(ur, msg_type=(Protocol.REG,))
 
     def _init_event_bus(self, cli_sock, sesion_key):
