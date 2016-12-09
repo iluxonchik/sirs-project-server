@@ -13,6 +13,8 @@ DB_USER_TABLE = 'user'
 
 # Crypto settings
 PBKDF2_RNDS = 100000  # server-side PBKDF2 rounds
+SIGN_DH_PUBLIC = False
+CHECK_CERTIFICATES = False
 
 # Token Settings
 DEFAULT_TOKEN_DURATION = Duration.hours(1)
@@ -35,8 +37,12 @@ SEND_ERROR_MSGS = True
 SYM_KEY_PATH = './server/keys/sym.key'  # used in token managment
 PRIV_KEY_PATH = './server/keys/priv.key'
 PUB_KEY_PATH = './server/keys/pub.key'
+ROOT_CERT_PATH = '/server/keys/ca-cert.pem'
+CLIENT_CERT_PATH = '/server/keys/client.cert'
 
 DIR_PATH = './dir/'  # directory to be encrypted
+
+SAFE_MODE = False
 
 # state file: this is how the server knows its state: wether the files
 # are encrypted of decrypted. This file is encrypted with the server's
@@ -51,3 +57,6 @@ LOG_LVL_TEST = logging.DEBUG
 
 # Bluetooth debugging settings
 MOCK_DEC_ENC_KEY = False
+
+# Mocking
+MOCK_SESSION_KEY = True

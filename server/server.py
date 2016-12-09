@@ -1,4 +1,4 @@
-import logging, os, base64
+import logging, os, base64, sys
 from hashlib import sha256
 
 import server.settings as settings
@@ -9,6 +9,11 @@ from server.listeners import (DirectoryEncryptorListener,
     InternalDirectoryEncryptorListner)
 
 from server.bluetooth.blue_router import BlueRouter
+from diffiehellman.diffiehellman import DiffieHellman
+
+from Crypto.PublicKey import RSA 
+from Crypto.Signature import PKCS1_v1_5 
+from Crypto.Hash import SHA256 
 
 from bluetooth import*
 
@@ -62,7 +67,7 @@ class Server(object):
         #       2. Instantiate BluetoothEventBus + listeners
         #       3. Send/receive BT msgs (always encrypted with session key)
 
-        session_key = self._generate_session_key()  # negortiate sesison key
+        session_key = self._generate_session_key(cli_sock)  # negortiate sesison key
         (eb, router) = self._init_event_bus(cli_sock, session_key)
         try:
             while True:
@@ -87,7 +92,7 @@ class Server(object):
         cli_sock.close()
         eb.process(Protocol.ENCRYPT_INTERNAL)
 
-    def _generate_session_key(self):
+    def _generate_session_key(self, cli_sock):
         """
         Genreate session key (Diffie-Hellman).
         
@@ -101,13 +106,79 @@ class Server(object):
         """
         logging.info('Initiating session key generation...')
         
-        # TODO: negotiate key
-        negotiated_key = b'Diffie-Hellman negotiated key'
-        
-        h = sha256()
-        h.update(negotiated_key)
-        session_key = h.digest()
-        return session_key
+        if settings.SAFE_MODE:
+            negotiated_key = b'Diffie-Hellman negotiated key'
+            
+            h = sha256()
+            h.update(negotiated_key)
+            session_key = h.digest()
+            return session_key 
+
+        if settings.CHECK_CERTIFICATES:
+            return os.system('openssl verify -verbose -CAfile {} '
+                'Intermediate.pem'.format(settings.ROOT_CERT_PATH, 
+                                            settings.CLIENT_CERT_PATH)) == 0 
+
+        if settings.MOCK_SESSION_KEY:
+            negotiated_key = b'Diffie-Hellman negotiated key'
+            
+            h = sha256()
+            h.update(negotiated_key)
+            session_key = h.digest()
+            return session_key
+        else:
+            # Don't mock
+            dh = DiffieHellman()
+            dh.generate_public_key()
+            public_key = dh.public_key
+
+            if settings.SIGN_DH_PUBLIC:
+                # value||siganture of value
+                public_key = public_key + self._rsa_sign(public_key)
+
+            if settings.BASE64_MODE:
+                public_key = base64.b64encode(public_key)
+
+            cli_sock.send(public_key)
+
+            client_public = cli_sock.receive(1024)
+
+            if settings.BASE64_MODE:
+                client_public = base64.b64decode(client_public)
+            
+            if settings.SIGN_DH_PUBLIC:
+                # value||siganture of value
+                signature = client_public[len(client_public - 32):]
+                data = client_public[:len(client_public) - 32]
+                if not self._rsa_check_signature(data, signature):
+                    logging.error('Invalid signature in Diffie-Hellman')
+                    sys.exit()
+            # NOTE: dh.generate_shared_secret() returns sha-256 digest of the
+            # obtained shared key
+            return dh.generate_shared_secret(client_public, echo_return_key=True)
+
+
+    def _rsa_sign(self, public_key):
+        key = open(settings.PRIV_KEY_PATH, "r").read() 
+        rsakey = RSA.importKey(key) 
+        signer = PKCS1_v1_5.new(rsakey) 
+        digest = SHA256.new() 
+        # It's being assumed the data is base64 encoded, 
+        # so it's decoded before updating the digest 
+        digest.update(base64.b64decode(public_key)) 
+        sign = signer.sign(digest) 
+        return sign
+
+    def _rsa_check_signature(self, data, signature):
+        pub_key = open(settings.PUB_KEY_PATH, "r").read() 
+        rsakey = RSA.importKey(pub_key) 
+        signer = PKCS1_v1_5.new(rsakey) 
+        digest = SHA256.new() 
+        # Assumes the data is base64 encoded to begin with
+        digest.update(data)
+        if signer.verify(digest, signature):
+            return True
+        return False
 
     def _init_listeners(self, cli_sock, event_bus, router):
         """
