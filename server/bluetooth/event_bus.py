@@ -1,5 +1,7 @@
 import abc
+import logging
 from server.exceptions import MessageTypeError
+
 
 class OnBluetoothMessageListener(object, metaclass=abc.ABCMeta):
     """
@@ -15,6 +17,7 @@ class OnBluetoothMessageListener(object, metaclass=abc.ABCMeta):
             data: data associated with the message (if applies)
         """
         pass
+
 
 class BluetoothEventBus(object):
     """
@@ -62,6 +65,8 @@ class BluetoothEventBus(object):
             if data.startswith(msg_type):
                 msg_len = len(msg_type)
                 new_data = data[msg_len:]
+                logging.info('Notifying {} listeners with data: {}'.format(
+                    msg_type, new_data))
                 self._notify_listeners(msg_type, new_data)
 
     def _init_message_types(self, protocol):

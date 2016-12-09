@@ -6,7 +6,11 @@ import logging
 import time
 from enum import Enum
 
-import settings
+import server.settings as settings
+
+from server.utils import StateFileState
+
+import os, base64
 
 from os.path import basename
 
@@ -14,6 +18,8 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
+
+from server.utils import Duration
 
 from .exceptions import FileDoesNotExistError, SymKeyNotFoundError
 
@@ -27,25 +33,29 @@ class FileCryptor(object):
     def __init__(self, key):
         self.fernet = Fernet(key=key)
 
-    def encrypt(self, path):
+    def encrypt(self, path, skip_filename=False):
         """
         Encryps the file with the specified path.
 
         Returns the path to the newly encrypted file.
         """
-        return self._encrypt_or_decrypt_file(path, action=self.Action.ENCRYPT)
+        logging.debug('Encrypting file {}'.format(path))
+        return self._encrypt_or_decrypt_file(path, action=self.Action.ENCRYPT,
+            skip_filename=skip_filename)
 
-    def decrypt(self, path):
+    def decrypt(self, path, skip_filename=False):
         """
         Decrypts the file with the specified path.
 
         Returns:
             (string) the path to the newly decrypted file.
         """
-        return self._encrypt_or_decrypt_file(path, action=self.Action.DECRYPT)
+        logging.debug('Decrypting file {}'.format(path))
+        return self._encrypt_or_decrypt_file(path, action=self.Action.DECRYPT,
+            skip_filename=skip_filename)
 
     def _encrypt_or_decrypt_file(self, path,
-                                 action=Action.ENCRYPT, encoding='utf-8'):
+                action=Action.ENCRYPT, encoding='utf-8', skip_filename=False):
         """
         Generic function which either encrypts or decrypts a file, based on the
         "action" arg.
@@ -68,8 +78,11 @@ class FileCryptor(object):
         os.remove(path)  # remove the original, plaintext file
 
         # NOTE: if the server crashes mid-encryption, file loss is possible
-
-        enc_file = self._encrypt_or_decrypt_filename(path, action=action)
+        if skip_filename:
+            logging.debug('\tSkipping filename encryption/decryption...')
+            enc_file = open(path, 'wb')
+        else:
+            enc_file = self._encrypt_or_decrypt_filename(path, action=action)
         enc_file_path = enc_file.name
 
         enc_content = operation(plaintext)
@@ -79,7 +92,7 @@ class FileCryptor(object):
         return enc_file_path
 
     def _encrypt_or_decrypt_filename(self, path,
-                                     action=Action.DECRYPT, encoding='utf-8'):
+            action=Action.DECRYPT, encoding='utf-8'):
         # NOTE: this function has been written from the encrypting perspective
         operation = (self.fernet.encrypt if action is self.Action.ENCRYPT
                      else self.fernet.decrypt)
@@ -109,6 +122,94 @@ class FileCryptor(object):
             raise FileExistsError('None is not a valid path for a file')
 
 
+class DirectoryCryptor(object):
+    def __init__(self, key):
+        self._fe = FileCryptor(key)
+        self._sf_key = FileCryptor(base64.b64encode(open(settings.SYM_KEY_PATH, 'rb').read()))
+
+    def encrypt(self, path):
+        is_enc = self._is_state_file_encrypted()
+        
+        if is_enc:
+            logging.warn('Tried to encrypt an already encrypted directory,'
+                ' skipping encryption...')
+            return
+
+        logging.debug('Encrypting directory {}'.format(path))
+        filenames = next(os.walk(path))[2]
+        for file in filenames:
+            self._fe.encrypt(os.path.join(path, file))
+
+        self._write_to_state_file(StateFileState.ENCRYPTED)
+        # TODO: if the content of the sate file was vaild, backup all of the
+        # files in the encrypted dir
+
+
+    def decrypt(self, path):
+        is_dec =  not self._is_state_file_encrypted()
+        
+        if is_dec:
+            logging.warn('Tried to decrypt an already decrypted directory,'
+                ' skipping decryption...')
+            return
+
+        logging.debug('Decrypting directory {}'.format(path))
+        filenames = next(os.walk(path))[2]
+        for file in filenames:
+            self._fe.decrypt(os.path.join(path, file))
+
+        self._write_to_state_file(StateFileState.DECRYPTED)
+
+    def _write_to_state_file(self, data):
+        logging.debug('Writing to state file: {}'.format(data))
+        state_file = open(settings.STATE_FILE, 'wb')
+        state_file.write(data)
+        state_file.close()
+        self._sf_key.encrypt(settings.STATE_FILE, skip_filename=True)
+
+    def _read_from_state_file(self):
+        try:
+            state_file = self._sf_key.decrypt(settings.STATE_FILE, 
+                                                        skip_filename=True)
+        except Exception:
+            # error in decryption: assuming stat file is decrypted (first start)
+            # let's write '0' to it -> files decrypted
+            # this 'breaks' the server: you can tamper with the file and it will
+            # assume it's decrypted, but you won't be able to trick the server
+            # into decrypting it, so it's not as bad. We don't have a lot of
+            # time for more sophisticated solutions now, so this one 'will do'.
+            logging.info('Error trying to decrypt the state file, writing '
+                'and returning 0 (could simply mean a fresh start).')
+            data = b'0' 
+            self._write_to_state_file(data)
+            return data
+
+        state_file = open(settings.STATE_FILE, 'rb')
+
+        content = state_file.read()
+        self._sf_key.encrypt(settings.STATE_FILE, skip_filename=True)
+        
+        return content
+
+    def _is_state_file_encrypted(self):
+        state = self._read_from_state_file()
+
+        logging.info('State file raw content: {}'.format(state))
+
+        if state == StateFileState.ENCRYPTED:
+            logging.debug('Sate file is encrypted')
+            return True
+        elif state == StateFileState.DECRYPTED:
+            logging.debug('Sate file is decrypted')
+            return False
+        else:
+            logging.info('Unexpected content of state file: {}\n'.format(state) + 
+                'This could simply mean that the file is uninitialized (first'
+                ' start)')
+            # TODO: raise an exception here, so that the files are not
+            # backed up after encryption?
+            return False
+
 class TokenManager(object):
     SEPARATOR = '||'
     # username||SEPARATOR||content||iv (iv is added later)
@@ -118,7 +219,7 @@ class TokenManager(object):
         self._username = username
         self._key_path = key
 
-    def generate_new(self, duration):
+    def generate_new(self, duration=settings.DEFAULT_TOKEN_DURATION):
         """
         Generate a new token valid for 'duration' seconds.
 
