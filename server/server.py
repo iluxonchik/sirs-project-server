@@ -6,7 +6,7 @@ from server.bluetooth.protocol import Protocol
 from server.bluetooth.event_bus import BluetoothEventBus
 from server.listeners import (DirectoryEncryptorListener, 
     DirectoryDecryptorListener, UserPasswordAuthListener, 
-    InternalDirectoryEncryptorListner)
+    InternalDirectoryEncryptorListner, UserRegistrationListener)
 
 from server.bluetooth.blue_router import BlueRouter
 from diffiehellman.diffiehellman import DiffieHellman
@@ -197,10 +197,15 @@ class Server(object):
 
         ua = UserPasswordAuthListener(router, internal_enc=ie)
 
+
         event_bus.subscribe(de, msg_type=(Protocol.ENCRYPT,))
         event_bus.subscribe(dd, msg_type=(Protocol.DECRYPT,))
         event_bus.subscribe(ua, msg_type=(Protocol.PWD_LOGIN,))
         event_bus.subscribe(ie, msg_type=(Protocol.ENCRYPT_INTERNAL,))
+        
+        if not settings.SAFE_MODE:
+            ur = UserRegistrationListener()
+            event_bus.subscribe(ur, msg_type=(Protocol.REG,))
 
     def _init_event_bus(self, cli_sock, sesion_key):
         """

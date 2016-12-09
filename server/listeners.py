@@ -167,3 +167,33 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
                 logging.info('{} failed login attempts, sever shutting down...'.
                     format(self._failed_logins))
                 sys.exit(0)
+
+class UserRegistrationListener(OnBluetoothMessageListener):
+    """
+    Receive user password auth request, then either send "login failed"
+    msg or send back a newly genreated token.
+    """
+
+    def __init__(self, router, internal_enc):
+        self._router = router
+        self._failed_logins = 0
+        self._internal_enc = internal_enc
+
+    def on_message(self, msg_type, data):
+        """
+        data: username||pwd
+        """
+        data_len = len(data)
+        pwd = data[data_len - 32:]
+        username = data[:data_len - 32]
+        
+        logging.debug( 'UserPasswordAuthListener received username: {}, '
+            'password: {}'.format(username, pwd))
+
+        decryption_key = base64.b64decode(derive_decryption_key(pwd, username))
+        pwd = derive_pwd_hash_from_decryption_key(decryption_key, username)
+
+        username = username.decode(encoding='utf-8')
+        user = User(username)
+        user.register(pwd)
+        self._internal_enc.key = base64.b64encode(decryption_key)
