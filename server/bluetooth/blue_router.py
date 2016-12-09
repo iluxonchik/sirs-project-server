@@ -17,6 +17,7 @@ class BlueRouter(object):
         self._key = session_key
         self._cli_sock = cli_sock
         self._counter = 0  # used for IV's and to gurantee freshness
+        self._out_counter = 0
 
     def receive(self, data):
         """
@@ -58,11 +59,15 @@ class BlueRouter(object):
         # Decrypt the message
         data = decrypt_data(data, self._key, iv)
 
+        logging.debug('Decrypted data: {}'.format(data))
+
         if not check_mac(self._key, data, iv, mac):
             logging.warn('INVALID MAC in received message, returning...')
             if settings.SEND_ERROR_MSGS:
                 self.send(Protocol.ERROR, b'Iinvalid MAC')
             return
+
+        self._update_iv(iv)
 
         logging.debug('Router received and decrypted data: {}'.format(data))
         
@@ -85,6 +90,8 @@ class BlueRouter(object):
 
         data_to_send = data + iv + mac
 
+        logging.debug('Sending data: {}'.format(data_to_send))
+
         if settings.BASE64_MODE:
             data_to_send = base64.b64encode(data_to_send)
             logging.debug('NOTE: operating in base64 mode, '
@@ -93,13 +100,16 @@ class BlueRouter(object):
         self._cli_sock.send(data_to_send)
 
     def _get_iv(self):
-        self._counter = self._counter + 1
-        iv = str(self._counter).encode()
+        iv = str(self._out_counter).encode()
         iv = iv.rjust(16, b'0')
+        self._out_counter = self._out_counter + 1
         return iv
 
     def _is_valid_iv(self, iv):
         iv = int(iv)
         logging.debug('\tReceived IV: {}, current coutner value: {}'.format(
             iv, self._counter))
-        return iv > self._counter
+        return iv >= self._counter
+
+    def _update_iv(self, new_iv):
+        self._counter = int(new_iv)

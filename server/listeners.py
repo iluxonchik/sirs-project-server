@@ -137,8 +137,7 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
             'password: {}'.format(username, pwd))
 
         decryption_key = base64.b64decode(derive_decryption_key(pwd, username))
-        self._internal_enc.key = decryption_key
-        pwd = derive_pwd_hash_from_login(decryption_key, username)
+        pwd = derive_pwd_hash_from_decryption_key(decryption_key, username)
 
         username = username.decode(encoding='utf-8')
         user = User(username)
@@ -150,6 +149,7 @@ class UserPasswordAuthListener(OnBluetoothMessageListener):
                 new_token = user.token_manger.generate_new()
                 self._router.send(Protocol.NEW_TOKEN, new_token)
                 self._failed_logins = 0
+                self._internal_enc.key = base64.b64encode(decryption_key)
             else:
                 # wrong user or pass
                 logging.debug('Login error: wrong username or password')
